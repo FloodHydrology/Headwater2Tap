@@ -108,9 +108,19 @@ fun <- function(n){
 t0<-Sys.time()
 df <- 
   lapply(
-    X = seq(1, 25), 
+    X = seq(1, nrow(pwi_shed)), 
     FUN = fun) %>% 
   bind_rows()
 tf<-Sys.time()
 tf-t0
 
+#Export
+write_csv(df, "output/pwi_output.csv")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 3.0 Export data  -------------------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+#fucking around
+df %>% mutate(downstream_runoff_prop = upstream_annual_runoff/(downstream_annual_runoff+ upstream_annual_runoff)) %>% summarise(med =median(downstream_runoff_prop, na.rm=T))
