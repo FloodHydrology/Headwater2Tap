@@ -22,6 +22,9 @@ library(raster)
 library(sf)
 library(tigris)
 
+#downlaod VAA flowline data
+vaa <- read_csv('output//vaa_flow_length.csv')
+
 #Load Public Water Intake Spatial Data
 pwi_point <- st_read("data//TNC_WaterIntakes//wat_012_city_water_intakes//CWM_v2_2//Snapped_Withdrawal_Points.shp")
 pwi_shed  <- st_read("data//TNC_WaterIntakes//wat_012_city_water_intakes//CWM_v2_2//World_Watershed8.shp")
@@ -43,58 +46,63 @@ pwi_point %>% st_geometry() %>% plot(., add=T, col="blue", pch=19)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 2.0 Estimate headwater streamlength and runoff proportion per watershed ------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#Function semi code
-# Identify individual waterhsed shape
-# reproject watershed shape to lat long
-# Get min and max lat and longs.  (Convert to decimal degree)
-# Filter VAA table to "cropped area" in previous step
-# Convert cropped VAA points to spatial points 
-# Clip points to watershed shape
-# Complete stats
-# Create plots
+#Create function
+fun <- function(n){
 
-
-#create function
-fun<-function(n){
-  # Identify unique id
-  id <- pwi_shed$DVSN_ID[n]
+  #Step 1: Identify individual watershed shape
+  shed <- pwi_shed[n,]
   
-  # Identify shed
-  shed <- pwi_shed %>% filter(DVSN_ID == id)
+  #Step 2: reproject shed into decimal degree
+  shed_proj <- shed %>% st_transform(., 4326) 
   
-  #estimate area
-  shed_area_km2 <- as.numeric(paste(st_area(shed)))/1000000
+  #Step 3: find min and max coordinates for shed_proj
+  shed_coords <- st_coordinates(shed_proj) %>% 
+    as_tibble() %>% 
+    summarise(
+      x_min=  min(X, na.rm=T), 
+      x_max = max(X, na.rm=T),
+      y_min = min(Y, na.rm=T), 
+      y_max = max(Y, na.rm=T))
   
-  # identify wwtps in shed
-  wwtps <- wwtp[shed,]
+  #Step 4: Filter VAA points to min and max coords
+  vaa<-vaa %>% 
+    filter(XCoord >= shed_coords$x_min) %>% 
+    filter(XCoord <= shed_coords$x_max) %>% 
+    filter(YCoord >= shed_coords$y_min) %>% 
+    filter(YCoord <= shed_coords$y_max) 
+    
+  #Step 5: Convert VAA points to sf and reproject to same coordinate as shed
+  vaa_pnts <- 
+    st_as_sf(vaa, 
+        coords = c("XCoord", "YCoord"), 
+        crs = 4326) %>% 
+    st_transform(., crs = st_crs(shed))
   
-  # count wwpt
-  n_wwtps <- nrow(wwtps)
+  #Step 6: Crop points to within the watershed area
+  vaa_pnts <- vaa_pnts[shed,]
   
-  # density of wwpt
-  d_wwtps <- n_wwtps/shed_area_km2
+  #Step 7: Calculate stats
+  output <- vaa_pnts %>% 
+    st_drop_geometry() %>% 
+    mutate(qincrama = as.numeric(paste(qincrama))) %>% 
+    mutate(reach_type = ifelse(SO12 == 0, "downstream", "upstream")) %>% 
+    group_by(reach_type) %>% 
+    summarise(
+      total_length  = sum(lengthkm,na.rm=T),
+      annual_runoff = sum(qincrama, na.rm=T)
+    ) %>% 
+    pivot_longer(cols = c(total_length, annual_runoff),
+                 names_to = "metric",
+                 values_to = "value") %>%
+    unite("category", reach_type, metric, sep = "_") %>%
+    pivot_wider(names_from = category,
+                values_from = value) %>% 
+    mutate(DVSN_ID = shed$DVSN_ID) %>% 
+    relocate(DVSN_ID)
   
-  #export results
-  tibble(id, n_wwtps, shed_area_km2, d_wwtps)
+  #Print output
+  output
 }
-
-#apply function 
-output <- lapply(
-  X = seq(1, nrow(pwi_shed)), #
-  FUN = fun) %>% 
-  bind_rows()
-
-#join to table
-pwi_point <- pwi_point %>% left_join(., output %>% rename(DVSN_ID = id))
-
-
-
-
-
-
-
-
-
 
 
 
