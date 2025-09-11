@@ -1,5 +1,5 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Name: Headwaters
+# Name: Calculate headwater contributions to PWIs
 # Coder: Nate Jones (cnjones7@ua.edu)
 # Date: 9/9/2025
 # Purpose: Examine how many headwater streams are upstream of surface drinking water intakes
@@ -114,13 +114,8 @@ df <-
 tf<-Sys.time()
 tf-t0
 
-#Export
-write_csv(df, "output/pwi_output.csv")
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 3.0 Export data  -------------------------------------------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-#fucking around
-df %>% mutate(downstream_runoff_prop = upstream_annual_runoff/(downstream_annual_runoff+ upstream_annual_runoff)) %>% summarise(med =median(downstream_runoff_prop, na.rm=T))
+#Export
+write_csv(df, "output/pwi_output.csv")
